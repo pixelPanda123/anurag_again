@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import tempfile
 import os
@@ -13,6 +14,15 @@ app = FastAPI(
     title="Multilingual Document Accessibility API",
     description="Backend API for speech, OCR, translation, summarization, and document understanding",
     version="1.0.0"
+)
+
+# CORS: allow frontend at http://localhost:3000
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # -------------------------
