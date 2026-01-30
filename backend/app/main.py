@@ -5,21 +5,30 @@ import os
 
 from app.services.sarvam_wrapper import translate_text, speech_to_text
 from app.services.ocr_service import extract_text_from_image
+from app.services.translation_service import translate_pipeline
+from app.services.llm_service import summarize_text, explain_for_audience
+from app.config import SUPPORTED_LANGUAGES
 
 app = FastAPI(
     title="Multilingual Document Accessibility API",
-    description="Backend API for speech, OCR, and text processing using Sarvam AI",
+    description="Backend API for speech, OCR, translation, summarization, and document understanding",
     version="1.0.0"
 )
 
 # -------------------------
-# Request Models
+# Request / Response Models
 # -------------------------
 
 class TranslateRequest(BaseModel):
     text: str
     source_language_code: str = "auto"
     target_language_code: str = "hi-IN"
+
+
+class TranslatePipelineRequest(BaseModel):
+    text: str
+    target_lang: str
+    source_language_code: str = "auto"
 
 
 class TranslateResponse(BaseModel):
@@ -34,6 +43,13 @@ class OCRResponse(BaseModel):
     text: str
 
 
+# -------- LLM MODELS --------
+
+class TextRequest(BaseModel):
+    text: str
+    audience: str = "student"
+
+
 # -------------------------
 # Routes
 # -------------------------
@@ -42,6 +58,8 @@ class OCRResponse(BaseModel):
 def health_check():
     return {"status": "ok"}
 
+
+# -------- BASIC TRANSLATION --------
 
 @app.post("/translate", response_model=TranslateResponse)
 def translate_endpoint(request: TranslateRequest):
@@ -57,10 +75,42 @@ def translate_endpoint(request: TranslateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/speech-to-text", response_model=SpeechToTextResponse)
-def speech_to_text_endpoint(file: UploadFile = File(...), language_code: str = "hi-IN"):
+# -------- MULTILINGUAL PIPELINE --------
+
+@app.post("/translate-pipeline", response_model=TranslateResponse)
+def translate_pipeline_endpoint(request: TranslatePipelineRequest):
     try:
-        # Save uploaded audio temporarily
+        translated = translate_pipeline(
+            text=request.text,
+            target_lang=request.target_lang,
+            source_language_code=request.source_language_code
+        )
+        return {"translated_text": translated}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------- SUPPORTED LANGUAGES --------
+
+@app.get("/languages")
+def list_supported_languages():
+    return {
+        "languages": [
+            {"code": code, "name": meta["name"]}
+            for code, meta in SUPPORTED_LANGUAGES.items()
+        ]
+    }
+
+
+# -------- SPEECH TO TEXT --------
+
+@app.post("/speech-to-text", response_model=SpeechToTextResponse)
+def speech_to_text_endpoint(
+    file: UploadFile = File(...),
+    language_code: str = "hi-IN"
+):
+    try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
             temp_audio.write(file.file.read())
             temp_audio_path = temp_audio.name
@@ -80,14 +130,11 @@ def speech_to_text_endpoint(file: UploadFile = File(...), language_code: str = "
             os.remove(temp_audio_path)
 
 
-# -------------------------
-# OCR Route (NEW)
-# -------------------------
+# -------- OCR --------
 
 @app.post("/image-to-text", response_model=OCRResponse)
 def image_to_text(file: UploadFile = File(...)):
     try:
-        # Save uploaded image temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_image:
             temp_image.write(file.file.read())
             temp_image_path = temp_image.name
@@ -102,3 +149,25 @@ def image_to_text(file: UploadFile = File(...)):
     finally:
         if 'temp_image_path' in locals() and os.path.exists(temp_image_path):
             os.remove(temp_image_path)
+
+
+# -------- SUMMARIZE --------
+
+@app.post("/summarize")
+def summarize_endpoint(request: TextRequest):
+    try:
+        summary = summarize_text(request.text)
+        return {"summary": summary}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------- EXPLAIN FOR AUDIENCE --------
+
+@app.post("/explain")
+def explain_endpoint(request: TextRequest):
+    try:
+        explanation = explain_for_audience(request.text, request.audience)
+        return {"explanation": explanation}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
