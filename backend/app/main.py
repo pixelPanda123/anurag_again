@@ -6,11 +6,12 @@ import os
 from app.services.sarvam_wrapper import translate_text, speech_to_text
 from app.services.ocr_service import extract_text_from_image
 from app.services.translation_service import translate_pipeline
+from app.services.llm_service import summarize_text, explain_for_audience
 from app.config import SUPPORTED_LANGUAGES
 
 app = FastAPI(
     title="Multilingual Document Accessibility API",
-    description="Backend API for speech, OCR, and text processing using Sarvam AI",
+    description="Backend API for speech, OCR, translation, summarization, and document understanding",
     version="1.0.0"
 )
 
@@ -42,6 +43,13 @@ class OCRResponse(BaseModel):
     text: str
 
 
+# -------- LLM MODELS --------
+
+class TextRequest(BaseModel):
+    text: str
+    audience: str = "student"
+
+
 # -------------------------
 # Routes
 # -------------------------
@@ -51,7 +59,7 @@ def health_check():
     return {"status": "ok"}
 
 
-# -------- BASIC TRANSLATION (unchanged) --------
+# -------- BASIC TRANSLATION --------
 
 @app.post("/translate", response_model=TranslateResponse)
 def translate_endpoint(request: TranslateRequest):
@@ -67,7 +75,7 @@ def translate_endpoint(request: TranslateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# -------- MULTILINGUAL PIPELINE (NEW) --------
+# -------- MULTILINGUAL PIPELINE --------
 
 @app.post("/translate-pipeline", response_model=TranslateResponse)
 def translate_pipeline_endpoint(request: TranslatePipelineRequest):
@@ -83,7 +91,7 @@ def translate_pipeline_endpoint(request: TranslatePipelineRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# -------- SUPPORTED LANGUAGES (OPTIONAL BUT USEFUL) --------
+# -------- SUPPORTED LANGUAGES --------
 
 @app.get("/languages")
 def list_supported_languages():
@@ -141,3 +149,25 @@ def image_to_text(file: UploadFile = File(...)):
     finally:
         if 'temp_image_path' in locals() and os.path.exists(temp_image_path):
             os.remove(temp_image_path)
+
+
+# -------- SUMMARIZE --------
+
+@app.post("/summarize")
+def summarize_endpoint(request: TextRequest):
+    try:
+        summary = summarize_text(request.text)
+        return {"summary": summary}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------- EXPLAIN FOR AUDIENCE --------
+
+@app.post("/explain")
+def explain_endpoint(request: TextRequest):
+    try:
+        explanation = explain_for_audience(request.text, request.audience)
+        return {"explanation": explanation}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
