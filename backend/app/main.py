@@ -4,13 +4,13 @@ import tempfile
 import os
 
 from app.services.sarvam_wrapper import translate_text, speech_to_text
+from app.services.ocr_service import extract_text_from_image
 
 app = FastAPI(
     title="Multilingual Document Accessibility API",
-    description="Backend API for speech and text processing using Sarvam AI",
+    description="Backend API for speech, OCR, and text processing using Sarvam AI",
     version="1.0.0"
 )
-
 
 # -------------------------
 # Request Models
@@ -28,6 +28,10 @@ class TranslateResponse(BaseModel):
 
 class SpeechToTextResponse(BaseModel):
     transcript: str
+
+
+class OCRResponse(BaseModel):
+    text: str
 
 
 # -------------------------
@@ -72,6 +76,29 @@ def speech_to_text_endpoint(file: UploadFile = File(...), language_code: str = "
         raise HTTPException(status_code=500, detail=str(e))
 
     finally:
-        # Clean up temp file
         if 'temp_audio_path' in locals() and os.path.exists(temp_audio_path):
             os.remove(temp_audio_path)
+
+
+# -------------------------
+# OCR Route (NEW)
+# -------------------------
+
+@app.post("/image-to-text", response_model=OCRResponse)
+def image_to_text(file: UploadFile = File(...)):
+    try:
+        # Save uploaded image temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_image:
+            temp_image.write(file.file.read())
+            temp_image_path = temp_image.name
+
+        extracted_text = extract_text_from_image(temp_image_path)
+
+        return {"text": extracted_text}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        if 'temp_image_path' in locals() and os.path.exists(temp_image_path):
+            os.remove(temp_image_path)

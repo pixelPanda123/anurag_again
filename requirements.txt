@@ -6,3 +6,6 @@ pydantic
 
 sarvamai
 python-multipart
+opencv-python
+pytesseract
+numpy
