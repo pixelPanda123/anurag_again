@@ -5,6 +5,8 @@ import os
 
 from app.services.sarvam_wrapper import translate_text, speech_to_text
 from app.services.ocr_service import extract_text_from_image
+from app.services.translation_service import translate_pipeline
+from app.config import SUPPORTED_LANGUAGES
 
 app = FastAPI(
     title="Multilingual Document Accessibility API",
@@ -13,13 +15,19 @@ app = FastAPI(
 )
 
 # -------------------------
-# Request Models
+# Request / Response Models
 # -------------------------
 
 class TranslateRequest(BaseModel):
     text: str
     source_language_code: str = "auto"
     target_language_code: str = "hi-IN"
+
+
+class TranslatePipelineRequest(BaseModel):
+    text: str
+    target_lang: str
+    source_language_code: str = "auto"
 
 
 class TranslateResponse(BaseModel):
@@ -43,6 +51,8 @@ def health_check():
     return {"status": "ok"}
 
 
+# -------- BASIC TRANSLATION (unchanged) --------
+
 @app.post("/translate", response_model=TranslateResponse)
 def translate_endpoint(request: TranslateRequest):
     try:
@@ -57,10 +67,42 @@ def translate_endpoint(request: TranslateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/speech-to-text", response_model=SpeechToTextResponse)
-def speech_to_text_endpoint(file: UploadFile = File(...), language_code: str = "hi-IN"):
+# -------- MULTILINGUAL PIPELINE (NEW) --------
+
+@app.post("/translate-pipeline", response_model=TranslateResponse)
+def translate_pipeline_endpoint(request: TranslatePipelineRequest):
     try:
-        # Save uploaded audio temporarily
+        translated = translate_pipeline(
+            text=request.text,
+            target_lang=request.target_lang,
+            source_language_code=request.source_language_code
+        )
+        return {"translated_text": translated}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------- SUPPORTED LANGUAGES (OPTIONAL BUT USEFUL) --------
+
+@app.get("/languages")
+def list_supported_languages():
+    return {
+        "languages": [
+            {"code": code, "name": meta["name"]}
+            for code, meta in SUPPORTED_LANGUAGES.items()
+        ]
+    }
+
+
+# -------- SPEECH TO TEXT --------
+
+@app.post("/speech-to-text", response_model=SpeechToTextResponse)
+def speech_to_text_endpoint(
+    file: UploadFile = File(...),
+    language_code: str = "hi-IN"
+):
+    try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
             temp_audio.write(file.file.read())
             temp_audio_path = temp_audio.name
@@ -80,14 +122,11 @@ def speech_to_text_endpoint(file: UploadFile = File(...), language_code: str = "
             os.remove(temp_audio_path)
 
 
-# -------------------------
-# OCR Route (NEW)
-# -------------------------
+# -------- OCR --------
 
 @app.post("/image-to-text", response_model=OCRResponse)
 def image_to_text(file: UploadFile = File(...)):
     try:
-        # Save uploaded image temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_image:
             temp_image.write(file.file.read())
             temp_image_path = temp_image.name
