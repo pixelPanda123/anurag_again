@@ -45,9 +45,9 @@ export default function ImageToTextPage() {
   return (
     <div className="h-full flex flex-col">
       <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Image to Text</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Image / PDF to Text</h1>
         <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-          Upload an image to extract text (OCR)
+          Upload an image or PDF to extract text (OCR / PDF extraction)
         </p>
       </div>
 
@@ -55,16 +55,16 @@ export default function ImageToTextPage() {
         <form onSubmit={handleSubmit} className="max-w-3xl space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Upload image</CardTitle>
-              <CardDescription>JPEG, PNG, WebP or TIFF</CardDescription>
+              <CardTitle>Upload image or PDF</CardTitle>
+              <CardDescription>JPEG, PNG, WebP, TIFF or PDF</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Image file</Label>
+                <Label>File</Label>
                 <input
                   ref={inputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,image/tiff"
+                  accept="image/jpeg,image/png,image/webp,image/tiff,application/pdf"
                   onChange={handleFileChange}
                   className="hidden"
                 />
@@ -105,7 +105,7 @@ export default function ImageToTextPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Extracted text</CardTitle>
-                <CardDescription>Text from image</CardDescription>
+                <CardDescription>Text from image or PDF</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="rounded-lg bg-slate-50 dark:bg-slate-900 p-4 whitespace-pre-wrap text-sm">

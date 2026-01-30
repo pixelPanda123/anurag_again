@@ -12,6 +12,9 @@ All SDK-specific logic is contained here.
 import os
 from app.sarvam_client import client
 
+# Sarvam API limit: input must be at most 2000 characters
+MAX_TRANSLATE_INPUT_LENGTH = 2000
+
 
 def speech_to_text(
     audio_path: str,
@@ -51,6 +54,27 @@ def speech_to_text(
         raise RuntimeError(f"Speech-to-text failed: {str(e)}") from e
 
 
+def _chunk_text(text: str, max_length: int) -> list[str]:
+    """Split text into chunks of at most max_length, preferring to break on spaces."""
+    if len(text) <= max_length:
+        return [text] if text.strip() else []
+    chunks = []
+    remaining = text
+    while remaining:
+        if len(remaining) <= max_length:
+            chunks.append(remaining)
+            break
+        segment = remaining[:max_length]
+        last_space = segment.rfind(" ")
+        if last_space > max_length // 2:
+            split_at = last_space + 1
+        else:
+            split_at = max_length
+        chunks.append(remaining[:split_at])
+        remaining = remaining[split_at:].lstrip()
+    return chunks
+
+
 def translate_text(
     text: str,
     source_language_code: str = "auto",
@@ -58,6 +82,7 @@ def translate_text(
 ) -> str:
     """
     Translates input text into a target language.
+    Long text is chunked to respect Sarvam's 2000-character input limit.
 
     Args:
         text (str): Input text to translate.
@@ -74,14 +99,19 @@ def translate_text(
     if not text or not text.strip():
         raise ValueError("Input text cannot be empty")
 
+    chunks = _chunk_text(text.strip(), MAX_TRANSLATE_INPUT_LENGTH)
+    if not chunks:
+        return ""
+
+    translated_parts = []
     try:
-        response = client.text.translate(
-            input=text,
-            source_language_code=source_language_code,
-            target_language_code=target_language_code
-        )
-
-        return response.translated_text
-
+        for chunk in chunks:
+            response = client.text.translate(
+                input=chunk,
+                source_language_code=source_language_code,
+                target_language_code=target_language_code
+            )
+            translated_parts.append(response.translated_text)
+        return " ".join(translated_parts)
     except Exception as e:
         raise RuntimeError(f"Translation failed: {str(e)}") from e

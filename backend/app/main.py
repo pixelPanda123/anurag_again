@@ -5,10 +5,15 @@ import tempfile
 import os
 
 from app.services.sarvam_wrapper import translate_text, speech_to_text
-from app.services.ocr_service import extract_text_from_image
+from app.services.ocr_service import extract_text_from_document
 from app.services.translation_service import translate_pipeline
 from app.services.llm_service import summarize_text, explain_for_audience
 from app.config import SUPPORTED_LANGUAGES
+from app.utils.chunking import chunk_text
+
+# Provider-safe limits (stay under API caps)
+TRANSLATE_MAX_CHARS = 900   # translation APIs
+LLM_MAX_CHARS = 900          # mayura / LLM (e.g. 1000 limit)
 
 app = FastAPI(
     title="Multilingual Document Accessibility API",
@@ -74,11 +79,24 @@ def health_check():
 @app.post("/translate", response_model=TranslateResponse)
 def translate_endpoint(request: TranslateRequest):
     try:
-        translated = translate_text(
-            text=request.text,
-            source_language_code=request.source_language_code,
-            target_language_code=request.target_language_code
-        )
+        text = (request.text or "").strip()
+        if not text:
+            return {"translated_text": ""}
+
+        chunks = chunk_text(text, TRANSLATE_MAX_CHARS)
+        if not chunks:
+            return {"translated_text": ""}
+
+        parts = []
+        for chunk in chunks:
+            part = translate_text(
+                text=chunk,
+                source_language_code=request.source_language_code,
+                target_language_code=request.target_language_code
+            )
+            parts.append(part)
+
+        translated = " ".join(parts)
         return {"translated_text": translated}
 
     except Exception as e:
@@ -90,11 +108,24 @@ def translate_endpoint(request: TranslateRequest):
 @app.post("/translate-pipeline", response_model=TranslateResponse)
 def translate_pipeline_endpoint(request: TranslatePipelineRequest):
     try:
-        translated = translate_pipeline(
-            text=request.text,
-            target_lang=request.target_lang,
-            source_language_code=request.source_language_code
-        )
+        text = (request.text or "").strip()
+        if not text:
+            return {"translated_text": ""}
+
+        chunks = chunk_text(text, TRANSLATE_MAX_CHARS)
+        if not chunks:
+            return {"translated_text": ""}
+
+        parts = []
+        for chunk in chunks:
+            part = translate_pipeline(
+                text=chunk,
+                target_lang=request.target_lang,
+                source_language_code=request.source_language_code
+            )
+            parts.append(part)
+
+        translated = " ".join(parts)
         return {"translated_text": translated}
 
     except Exception as e:
@@ -140,25 +171,36 @@ def speech_to_text_endpoint(
             os.remove(temp_audio_path)
 
 
-# -------- OCR --------
+# -------- OCR (images + PDFs) --------
 
 @app.post("/image-to-text", response_model=OCRResponse)
 def image_to_text(file: UploadFile = File(...)):
+    """
+    Extract text from an uploaded image (jpg, png, webp, tiff) or PDF.
+    """
+    suffix = os.path.splitext(file.filename or "")[1] or ".jpg"
+    if suffix.lower() not in {".pdf", ".jpg", ".jpeg", ".png", ".webp", ".tiff", ".tif", ".bmp"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file type. Use PDF or image (jpg, png, webp, tiff)."
+        )
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_image:
-            temp_image.write(file.file.read())
-            temp_image_path = temp_image.name
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+            temp_file.write(file.file.read())
+            temp_path = temp_file.name
 
-        extracted_text = extract_text_from_image(temp_image_path)
+        extracted_text = extract_text_from_document(temp_path, file.filename or "file")
 
         return {"text": extracted_text}
 
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
     finally:
-        if 'temp_image_path' in locals() and os.path.exists(temp_image_path):
-            os.remove(temp_image_path)
+        if 'temp_path' in locals() and os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 # -------- SUMMARIZE --------
@@ -166,8 +208,22 @@ def image_to_text(file: UploadFile = File(...)):
 @app.post("/summarize")
 def summarize_endpoint(request: TextRequest):
     try:
-        summary = summarize_text(request.text)
+        text = (request.text or "").strip()
+        if not text:
+            return {"summary": ""}
+
+        chunks = chunk_text(text, LLM_MAX_CHARS)
+        if not chunks:
+            return {"summary": ""}
+
+        parts = []
+        for chunk in chunks:
+            part = summarize_text(chunk)
+            parts.append(part)
+
+        summary = "\n\n".join(parts)
         return {"summary": summary}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -177,7 +233,21 @@ def summarize_endpoint(request: TextRequest):
 @app.post("/explain")
 def explain_endpoint(request: TextRequest):
     try:
-        explanation = explain_for_audience(request.text, request.audience)
+        text = (request.text or "").strip()
+        if not text:
+            return {"explanation": ""}
+
+        chunks = chunk_text(text, LLM_MAX_CHARS)
+        if not chunks:
+            return {"explanation": ""}
+
+        parts = []
+        for chunk in chunks:
+            part = explain_for_audience(chunk, request.audience)
+            parts.append(part)
+
+        explanation = "\n\n".join(parts)
         return {"explanation": explanation}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
