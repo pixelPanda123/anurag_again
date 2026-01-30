@@ -2,7 +2,8 @@ import pytesseract
 import re
 from app.services.preprocessing import preprocess_image
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+if platform.system() == "Windows":
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 def detect_script(img):
     try:
