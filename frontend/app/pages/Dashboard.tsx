@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
-import { AlertCircle } from 'lucide-react';
 import DocumentUploader from '@/app/components/DocumentUploader';
 import TextInputPanel from '@/app/components/TextInputPanel';
 import AudioRecorder from '@/app/components/AudioRecorder';
@@ -15,7 +14,6 @@ import ErrorState from '@/app/components/ErrorState';
 import LoadingState from '@/app/components/LoadingState';
 import { Button } from '@/app/components/ui/button';
 import type { DomainType, ProcessingResult, ApiError } from '@/lib/types';
-import { DEMO_MODE, DEMO_EXTRACTION, DEMO_TRANSLATION, DEMO_SIMPLIFICATION } from '@/lib/constants';
 import * as api from '@/lib/api';
 
 interface DashboardProps {
@@ -60,24 +58,8 @@ export default function Dashboard({ onNavigateToLanding, onNavigateToHistory }: 
     setDocumentContent(text);
 
     try {
-      if (DEMO_MODE) {
-        // Simulate API delay for demo
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-
-        const demoResult: ProcessingResult = {
-          originalText: text,
-          translatedText: DEMO_TRANSLATION.translatedText,
-          simplifiedText: DEMO_SIMPLIFICATION.simplifiedText,
-          audioUrl: undefined,
-        };
-
-        setResult(demoResult);
-      } else {
-        // Call real API
-        const result = await api.processDocument(text, selectedLanguage, selectedDomain);
-        setResult(result);
-      }
-
+      const data = await api.processDocument(text, selectedLanguage, selectedDomain);
+      setResult(data);
       setViewMode('output');
     } catch (err) {
       handleError(err);
@@ -91,27 +73,10 @@ export default function Dashboard({ onNavigateToLanding, onNavigateToHistory }: 
     setIsLoading(true);
 
     try {
-      if (DEMO_MODE) {
-        // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        const demoResult: ProcessingResult = {
-          originalText: DEMO_EXTRACTION.originalText,
-          translatedText: DEMO_TRANSLATION.translatedText,
-          simplifiedText: DEMO_SIMPLIFICATION.simplifiedText,
-          audioUrl: undefined,
-        };
-        setDocumentContent(DEMO_EXTRACTION.originalText);
-        setResult(demoResult);
-      } else {
-        // Extract text from image
-        const extraction = await api.extractTextFromImage(file, selectedDomain);
-        setDocumentContent(extraction.extractedText);
-
-        // Process the extracted text
-        const processedResult = await api.processDocument(extraction.extractedText, selectedLanguage, selectedDomain);
-        setResult(processedResult);
-      }
-
+      const extraction = await api.extractTextFromImage(file, selectedDomain);
+      setDocumentContent(extraction.extractedText);
+      const processedResult = await api.processDocument(extraction.extractedText, selectedLanguage, selectedDomain);
+      setResult(processedResult);
       setViewMode('output');
     } catch (err) {
       handleError(err);
@@ -131,26 +96,10 @@ export default function Dashboard({ onNavigateToLanding, onNavigateToHistory }: 
     setIsLoading(true);
 
     try {
-      if (DEMO_MODE) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        const demoResult: ProcessingResult = {
-          originalText: DEMO_EXTRACTION.originalText,
-          translatedText: DEMO_TRANSLATION.translatedText,
-          simplifiedText: DEMO_SIMPLIFICATION.simplifiedText,
-          audioUrl: undefined,
-        };
-        setDocumentContent(DEMO_EXTRACTION.originalText);
-        setResult(demoResult);
-      } else {
-        // Transcribe audio
-        const transcription = await api.transcribeAudio(recordedAudio, selectedLanguage, selectedDomain);
-        setDocumentContent(transcription.text);
-
-        // Process the transcribed text
-        const processedResult = await api.processDocument(transcription.text, selectedLanguage, selectedDomain);
-        setResult(processedResult);
-      }
-
+      const transcription = await api.transcribeAudio(recordedAudio, selectedLanguage, selectedDomain);
+      setDocumentContent(transcription.text);
+      const processedResult = await api.processDocument(transcription.text, selectedLanguage, selectedDomain);
+      setResult(processedResult);
       setViewMode('output');
     } catch (err) {
       handleError(err);
@@ -179,16 +128,6 @@ export default function Dashboard({ onNavigateToLanding, onNavigateToHistory }: 
           </div>
         </div>
       </header>
-
-      {/* Demo Mode Banner */}
-      {DEMO_MODE && (
-        <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-3 flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
-          <p className="text-sm text-yellow-700 font-medium">
-            Demo mode is active. Using mock data for testing. Disable DEMO_MODE in lib/constants.ts to use real API.
-          </p>
-        </div>
-      )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (

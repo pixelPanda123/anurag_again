@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
+import { Card, CardContent } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import DocumentUploader from '@/app/components/DocumentUploader';
 import TextInputPanel from '@/app/components/TextInputPanel';
@@ -15,41 +15,32 @@ import { useApp } from '@/lib/contexts/app-context';
 import { toast } from 'sonner';
 import { RefreshCw } from 'lucide-react';
 import type { ProcessedDocument } from '@/lib/contexts/app-context';
+import type { DomainType } from '@/lib/types';
+import * as api from '@/lib/api';
 
 export default function DashboardPage() {
-  const { currentDocument, addDocument, language, domain, demoMode } = useApp();
+  const { currentDocument, addDocument, language, domain } = useApp();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('upload');
 
-  const handleDocumentProcess = async (text: string, source: 'file' | 'text' | 'voice') => {
+  const toProcessedDocument = (result: { originalText: string; translatedText: string; simplifiedText: string; audioUrl?: string }): ProcessedDocument => ({
+    id: `doc-${Date.now()}`,
+    ...result,
+    language,
+    domain,
+    timestamp: new Date(),
+  });
+
+  const handleDocumentProcess = async (text: string) => {
     setError(null);
     setIsProcessing(true);
-
     try {
-      // Simulate processing
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      if (demoMode) {
-        // Demo mode: generate mock results
-        const mockDocument: ProcessedDocument = {
-          id: `doc-${Date.now()}`,
-          originalText: text,
-          translatedText: `[Translated to ${language}] ${text.slice(0, 100)}...`,
-          simplifiedText: `[Simplified] This document contains important information. Key points: 1) First point 2) Second point 3) Third point.`,
-          audioUrl: undefined,
-          language,
-          domain,
-          timestamp: new Date(),
-        };
-        addDocument(mockDocument);
-        toast.success('Document processed successfully!');
-      } else {
-        // Real API call would go here
-        toast.info('API integration coming soon');
-      }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to process document';
+      const result = await api.processDocument(text, language, domain as DomainType);
+      addDocument(toProcessedDocument(result));
+      toast.success('Document processed successfully!');
+    } catch (err: unknown) {
+      const errorMsg = err && typeof err === 'object' && 'message' in err ? String((err as { message: string }).message) : 'Failed to process document';
       setError(errorMsg);
       toast.error(errorMsg);
     } finally {
@@ -57,23 +48,42 @@ export default function DashboardPage() {
     }
   };
 
-  const handleFileUpload = (file: File) => {
-    // Simulate reading file and extracting text
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const text = `Document: ${file.name}\n\nContent extracted from document...`;
-      await handleDocumentProcess(text, 'file');
-    };
-    reader.readAsText(file);
+  const handleFileUpload = async (file: File) => {
+    setError(null);
+    setIsProcessing(true);
+    try {
+      const { extractedText } = await api.extractTextFromImage(file, domain as DomainType);
+      const result = await api.processDocument(extractedText, language, domain as DomainType);
+      addDocument(toProcessedDocument(result));
+      toast.success('Document processed successfully!');
+    } catch (err: unknown) {
+      const errorMsg = err && typeof err === 'object' && 'message' in err ? String((err as { message: string }).message) : 'Failed to process document';
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleTextSubmit = (text: string) => {
-    handleDocumentProcess(text, 'text');
+    handleDocumentProcess(text);
   };
 
-  const handleAudioTranscribe = (audioBlob: Blob) => {
-    const text = `[Audio transcribed from recording]`;
-    handleDocumentProcess(text, 'voice');
+  const handleAudioTranscribe = async (audioBlob: Blob) => {
+    setError(null);
+    setIsProcessing(true);
+    try {
+      const { text } = await api.transcribeAudio(audioBlob, language, domain as DomainType);
+      const result = await api.processDocument(text, language, domain as DomainType);
+      addDocument(toProcessedDocument(result));
+      toast.success('Document processed successfully!');
+    } catch (err: unknown) {
+      const errorMsg = err && typeof err === 'object' && 'message' in err ? String((err as { message: string }).message) : 'Failed to process document';
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleRetry = () => {
