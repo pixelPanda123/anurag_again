@@ -3,3 +3,9 @@ uvicorn
 requests
 python-dotenv
 pydantic
+
+sarvamai
+python-multipart
+opencv-python
+pytesseract
+numpy

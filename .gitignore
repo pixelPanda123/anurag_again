@@ -7,6 +7,8 @@ __pycache__/
 venv/
 .env/
 .venv/
+# Virtual environment
+
 
 # Python cache
 __pycache__/
@@ -19,6 +21,7 @@ __pycache__/
 Thumbs.db
 
 # VS Code / IDE
+# Editor / IDE
 .vscode/
 .idea/
 
