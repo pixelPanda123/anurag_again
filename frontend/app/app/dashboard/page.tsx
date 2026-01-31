@@ -346,7 +346,6 @@ export default function DashboardPage() {
 
             <>
               <OutputPanel document={currentDocument} />
-              <ChatPanel document={currentDocument} />
             </>
 
           ) : (
