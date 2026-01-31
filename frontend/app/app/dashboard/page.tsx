@@ -43,15 +43,41 @@ export default function DashboardPage() {
       translatedText: string;
       simplifiedText: string;
       audioUrl?: string;
-    }
+    },
+    aiData?: any
   ): ProcessedDocument => ({
 
     id: `doc-${Date.now()}`,
     ...result,
+
+    aiAnalysis: aiData ?? null, // ✅ STORE AI
+
     language,
     domain,
     timestamp: new Date(),
   });
+
+
+  // ----------------------------------------
+  // Shared AI Call
+  // ----------------------------------------
+
+  const runAIAnalysis = async (text: string) => {
+
+    try {
+
+      return await api.analyzeDocumentAI(
+        text,
+        domain.toLowerCase()
+      );
+
+    } catch (err) {
+
+      console.warn("AI Analysis Failed:", err);
+
+      return null;
+    }
+  };
 
 
   // ----------------------------------------
@@ -65,13 +91,18 @@ export default function DashboardPage() {
 
     try {
 
+      // Process
       const result = await api.processDocument(
         text,
         language,
         domain as DomainType
       );
 
-      addDocument(toProcessedDocument(result));
+      // AI
+      const aiData = await runAIAnalysis(result.originalText);
+
+      // Save
+      addDocument(toProcessedDocument(result, aiData));
 
       toast.success('Document processed successfully!');
 
@@ -88,6 +119,7 @@ export default function DashboardPage() {
       toast.error(errorMsg);
 
     } finally {
+
       setIsProcessing(false);
     }
   };
@@ -100,16 +132,22 @@ export default function DashboardPage() {
 
     try {
 
+      // OCR
       const { extractedText } =
         await api.extractTextFromImage(file, domain as DomainType);
 
+      // Process
       const result = await api.processDocument(
         extractedText,
         language,
         domain as DomainType
       );
 
-      addDocument(toProcessedDocument(result));
+      // AI
+      const aiData = await runAIAnalysis(result.originalText);
+
+      // Save
+      addDocument(toProcessedDocument(result, aiData));
 
       toast.success('Document processed successfully!');
 
@@ -126,6 +164,7 @@ export default function DashboardPage() {
       toast.error(errorMsg);
 
     } finally {
+
       setIsProcessing(false);
     }
   };
@@ -143,19 +182,25 @@ export default function DashboardPage() {
 
     try {
 
+      // STT
       const { text } = await api.transcribeAudio(
         audioBlob,
         language,
         domain as DomainType
       );
 
+      // Process
       const result = await api.processDocument(
         text,
         language,
         domain as DomainType
       );
 
-      addDocument(toProcessedDocument(result));
+      // AI
+      const aiData = await runAIAnalysis(result.originalText);
+
+      // Save
+      addDocument(toProcessedDocument(result, aiData));
 
       toast.success('Document processed successfully!');
 
@@ -172,6 +217,7 @@ export default function DashboardPage() {
       toast.error(errorMsg);
 
     } finally {
+
       setIsProcessing(false);
     }
   };
@@ -240,17 +286,9 @@ export default function DashboardPage() {
 
             <TabsList className="grid grid-cols-3 mb-4">
 
-              <TabsTrigger value="upload">
-                Upload
-              </TabsTrigger>
-
-              <TabsTrigger value="text">
-                Text
-              </TabsTrigger>
-
-              <TabsTrigger value="voice">
-                Voice
-              </TabsTrigger>
+              <TabsTrigger value="upload">Upload</TabsTrigger>
+              <TabsTrigger value="text">Text</TabsTrigger>
+              <TabsTrigger value="voice">Voice</TabsTrigger>
 
             </TabsList>
 

@@ -22,8 +22,8 @@ export interface ProcessedDocument {
 
   audioUrl?: string;
 
-  // ✅ NEW: AI medical / legal analysis
-  aiAnalysis?: string;
+  // ✅ FIXED: AI returns object, not string
+  aiAnalysis?: any;
 
   language: string;
   domain: string;
@@ -204,10 +204,11 @@ export function AppProvider({
 
       setDocuments(
         savedDocs.map((doc: any) => ({
+
           ...doc,
 
-          // keep aiAnalysis if present
-          aiAnalysis: doc.aiAnalysis,
+          // ✅ Keep AI data
+          aiAnalysis: doc.aiAnalysis ?? null,
 
           timestamp: new Date(doc.timestamp),
         }))
