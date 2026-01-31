@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import tempfile
 import os
+from app.services.llm_analyzer import analyze_document_ai
+
 
 from app.services.sarvam_wrapper import translate_text, speech_to_text
 from app.services.ocr_service import extract_text_from_document
@@ -250,4 +252,22 @@ def explain_endpoint(request: TextRequest):
         return {"explanation": explanation}
 
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# -------- AI DOCUMENT ANALYSIS --------
+
+@app.post("/ai-analyze")
+def ai_analyze(request: TextRequest):
+
+    try:
+
+        result = analyze_document_ai(
+            request.text,
+            request.audience
+        )
+
+        return result
+
+    except Exception as e:
+
         raise HTTPException(status_code=500, detail=str(e))
