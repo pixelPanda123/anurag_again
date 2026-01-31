@@ -5,12 +5,27 @@ export type Language = {
   label: string;
 };
 
+
+// ----------------------------
+// MAIN RESULT TYPE (UPDATED)
+// ----------------------------
+
 export type ProcessingResult = {
   originalText: string;
   translatedText: string;
   simplifiedText: string;
+
+  // Optional audio output
   audioUrl?: string;
+
+  // ✅ NEW: AI Medical / Legal Analysis
+  aiAnalysis?: string;
 };
+
+
+// ----------------------------
+// CHAT
+// ----------------------------
 
 export type ChatMessage = {
   id: string;
@@ -19,20 +34,40 @@ export type ChatMessage = {
   timestamp: number;
 };
 
+
+// ----------------------------
+// UPLOAD
+// ----------------------------
+
 export type DocumentUploadResponse = {
   extractedText: string;
   confidence: number;
 };
+
+
+// ----------------------------
+// TRANSLATION
+// ----------------------------
 
 export type TranslationResponse = {
   translatedText: string;
   targetLanguage: string;
 };
 
+
+// ----------------------------
+// SPEECH
+// ----------------------------
+
 export type SpeechToTextResponse = {
   text: string;
   duration: number;
 };
+
+
+// ----------------------------
+// SIMPLIFICATION
+// ----------------------------
 
 export type SimplificationResponse = {
   simplifiedText: string;
@@ -40,15 +75,30 @@ export type SimplificationResponse = {
   actionItems: string[];
 };
 
+
+// ----------------------------
+// TTS
+// ----------------------------
+
 export type TextToSpeechResponse = {
   audioUrl: string;
   duration: number;
 };
 
+
+// ----------------------------
+// HEALTH
+// ----------------------------
+
 export type HealthResponse = {
   status: "healthy" | "error";
   message: string;
 };
+
+
+// ----------------------------
+// API ERROR
+// ----------------------------
 
 export type ApiError = {
   message: string;
