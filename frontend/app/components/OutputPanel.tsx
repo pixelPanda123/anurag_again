@@ -346,7 +346,9 @@ export default function OutputPanel({ document }: OutputPanelProps) {
 
                 <div className="bg-indigo-50 dark:bg-indigo-950 rounded-lg p-4 whitespace-pre-wrap break-words text-sm leading-relaxed border border-indigo-200 dark:border-indigo-800">
 
-                  {document.aiAnalysis}
+                  {typeof document.aiAnalysis === 'string'
+                    ? document.aiAnalysis
+                    : JSON.stringify(document.aiAnalysis, null, 2)}
 
                 </div>
 

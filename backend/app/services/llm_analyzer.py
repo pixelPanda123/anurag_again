@@ -1,5 +1,7 @@
+
 import os
 import json
+import re
 from groq import Groq
 
 
@@ -18,6 +20,31 @@ def get_client():
 
 
 # ---------------------------------------------------------------------------
+# JSON EXTRACTOR (Fallback Parser)
+# ---------------------------------------------------------------------------
+
+def extract_json_from_text(text: str) -> dict:
+    """
+    Extract JSON object from LLM output safely.
+    Handles markdown, explanations, etc.
+    """
+
+    # Remove markdown blocks
+    text = text.replace("```json", "").replace("```", "").strip()
+
+    # Find first { and last }
+    start = text.find("{")
+    end = text.rfind("}")
+
+    if start == -1 or end == -1:
+        raise ValueError("No JSON object found")
+
+    json_str = text[start:end + 1]
+
+    return json.loads(json_str)
+
+
+# ---------------------------------------------------------------------------
 # MAIN AI ANALYZER
 # ---------------------------------------------------------------------------
 
@@ -29,71 +56,119 @@ def analyze_document_ai(text: str, audience: str = "general") -> dict:
 
     client = get_client()
 
+    # ----------------------------
+    # STRICT PROMPT (IMPORTANT)
+    # ----------------------------
+
     prompt = f"""
-You are an expert medical and legal document analyst.
+You are a senior medical and legal analysis AI.
 
-Analyze the following document:
+You MUST return ONLY valid JSON.
+No markdown.
+No explanation outside JSON.
+No extra text.
 
-{text}
+Your job is to give PRACTICAL, DETAILED analysis.
 
-Tasks:
+--------------------------------
 
-1. Detect document type: medical / legal / general
-
-2. If MEDICAL:
-   - Extract test values
-   - Highlight abnormal values
-   - Explain in simple language for {audience}
-
-3. If LEGAL:
-   - List rights
-   - List obligations
-   - Detect penalties
-   - Determine urgency (low / medium / high)
-
-Return ONLY valid JSON in this format:
+OUTPUT FORMAT:
 
 {{
-  "type": "medical | legal | general",
+  "type": "medical" | "legal" | "general",
 
   "medical": {{
-    "normal": [],
-    "abnormal": [],
-    "explanation": ""
+    "normal": [
+      "Test name: value (reference range)"
+    ],
+
+    "abnormal": [
+      "Test name: value (HIGH/LOW → medical meaning)"
+    ],
+
+    "explanation": "Simple explanation, risks, and advice"
   }},
 
   "legal": {{
     "rights": [],
     "obligations": [],
     "penalties": [],
-    "urgency": ""
+    "urgency": "low" | "medium" | "high"
   }}
 }}
+
+--------------------------------
+
+MEDICAL RULES:
+
+1. Always include:
+   - Test name
+   - Actual value
+   - Normal range
+   - Meaning
+
+2. For abnormal results:
+   - Explain possible cause
+   - Mention health risk
+
+3. In explanation:
+   - Summarize condition
+   - Suggest next step (doctor, test, diet, etc.)
+
+4. If document is unclear → say so.
+
+--------------------------------
+
+Analyze this document carefully:
+
+{text}
 """
+
+
+    # ----------------------------
+    # CALL LLM
+    # ----------------------------
 
     response = client.chat.completions.create(
 
         model="llama-3.1-8b-instant",
 
         messages=[
-            {"role": "system", "content": "You are a professional document analyst."},
-            {"role": "user", "content": prompt}
+            {
+                "role": "system",
+                "content": "You are a strict JSON-only API. Never output anything except valid JSON."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
         ],
 
-        temperature=0.2,
+        temperature=0.0,   # 🔴 Force deterministic output
         max_tokens=700
     )
 
     raw_output = response.choices[0].message.content.strip()
 
-    # Try parsing JSON safely
+
+    # ----------------------------
+    # PARSE OUTPUT (SAFE)
+    # ----------------------------
+
     try:
+        # First try direct parse (fast path)
         return json.loads(raw_output)
 
     except Exception:
 
-        # Fallback if model doesn't obey format
-        return {
-            "error": "Failed to parse LLM output",
-            "raw_output": raw_output
-        }
+        try:
+            # Fallback: extract JSON from messy output
+            return extract_json_from_text(raw_output)
+
+        except Exception:
+
+            # Final fallback
+            return {
+                "error": "Failed to parse LLM output",
+                "raw_output": raw_output
+            }
